@@ -21,13 +21,14 @@ import pandas as pd
 
 import config_v2 as C
 from data_v2 import (load_train, load_benchmark, biencoder_val_uids, select_rerank_splits,
-                     load_emb, build_train_corpus, benchmark_seen_share)
+                     load_emb, build_train_corpus, benchmark_seen_share, clean_train_uids)
 from history_v2 import HistoryStats
 from pool_v2 import CorpusIndex, build_pool_features, feature_columns, CHANNEL_NAMES, NO_RANK
 from postprocess_v2 import (recall_at_k, recall_from_mask, pool_recall, tune_postprocess, select_topk,
                             add_helper_cols, save_params)
 from models_v2 import train_one, model_ranks, ensemble_score, tune_weights, save_ensemble
 from text_prep import query_key_series
+
 
 os.makedirs(C.WORK_DIR, exist_ok=True)
 NEG_KEEP = 1.0   # доля негативов в ОБУЧЕНИИ (0.5 = в 2 раза меньше RAM); valid/test не трогаем
@@ -41,8 +42,15 @@ hq = tq[~tq["query_uid"].isin(f_set)]
 fq_all = tq[tq["query_uid"].isin(f_set)]
 n_pos = tp.groupby("query_uid").size()
 seen_share = C.EVAL_SEEN_SHARE if C.EVAL_SEEN_SHARE is not None else benchmark_seen_share(bq, tq)
-tr_uids, va_uids, te_uids = select_rerank_splits(
-    fq_all, set(query_key_series(hq)), n_pos, seen_share, C.RERANK_VALID_N, C.RERANK_TEST_N)
+# valid/test - из тех же первых 3% запросов, что в прошлых экспериментах (сравнение честное);
+# train ре-ранкера - из ВСЕХ F-запросов (10%), кроме eval
+eval_frac = getattr(C, "EVAL_FROM_FRACTION", C.BIENCODER_VAL_FRACTION)
+f_small = set(biencoder_val_uids(tq, frac=eval_frac))
+_, va_uids, te_uids = select_rerank_splits(
+    tq[tq["query_uid"].isin(f_small)], set(query_key_series(tq[~tq["query_uid"].isin(f_small)])),
+    n_pos, seen_share, C.RERANK_VALID_N, C.RERANK_TEST_N)
+tr_uids = clean_train_uids(fq_all, set(va_uids) | set(te_uids), n_pos,
+                           max_queries=getattr(C, "MAX_RERANK_TRAIN_QUERIES", None))
 use_uids = np.concatenate([tr_uids, va_uids, te_uids])
 
 # %% корпус (+ дистракторы из benchmark) и эмбеддинги

@@ -116,3 +116,23 @@ def select_rerank_splits(fq: pd.DataFrame, h_keys: set, n_pos: pd.Series, seen_s
     print(f"[split] eval: {len(ev)} (новых текстов {n_unseen}, виденных {n_seen}; доля виденных {n_seen/max(len(ev),1):.2f}"
           f" vs бенчмарк {seen_share:.2f}) -> valid {len(va)} / test {len(te)};  train: {before} -> {len(tr)} после чистки")
     return tr["query_uid"].values, va["query_uid"].values, te["query_uid"].values
+
+
+def clean_train_uids(fq: pd.DataFrame, exclude_uids: set, n_pos: pd.Series, max_queries=None,
+                     seed=C.SPLIT_SEED, max_pos=C.MAX_POS_PER_QUERY, min_chars=C.MIN_QUERY_CHARS,
+                     dedup=C.DEDUP_TRAIN_TEXTS):
+    """Train ре-ранкера из всех F-запросов, кроме eval: без текстов из eval (утечка по тексту),
+    без выбросов, не больше dedup запросов на текст, не больше max_queries (память)."""
+    from text_prep import query_key_series
+    d = fq[["query_uid", "search_query"]].copy()
+    d["qkey"] = query_key_series(fq).values
+    d["npos"] = n_pos.reindex(d["query_uid"]).fillna(0).values
+    ev_keys = set(d.loc[d["query_uid"].isin(exclude_uids), "qkey"])
+    tr = d[~d["qkey"].isin(ev_keys)]
+    before = len(tr)
+    tr = tr[(tr["npos"] > 0) & (tr["npos"] <= max_pos) & (tr["search_query"].fillna("").str.strip().str.len() >= min_chars)]
+    tr = tr.sample(frac=1.0, random_state=seed).groupby("qkey").head(dedup)
+    if max_queries and len(tr) > max_queries:
+        tr = tr.sample(max_queries, random_state=seed)
+    print(f"[split] train ре-ранкера: {before} -> {len(tr)} после чистки/лимита")
+    return tr["query_uid"].values

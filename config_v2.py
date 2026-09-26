@@ -77,7 +77,10 @@ DEDUP_TRAIN_TEXTS = 3      # из обучения ре-ранкера: не б�
 # ре-ранкера завышен для позитивов (голова их запомнила), LightGBM ему
 # переверит, а на бенчмарке этого эффекта нет. Остальные 97% запросов - "история".
 SPLIT_SEED = 42
-BIENCODER_VAL_FRACTION = 0.03
+
+BIENCODER_VAL_FRACTION = 0.10
+EVAL_FROM_FRACTION = 0.03            # valid/test - из тех же первых 3% запросов, что в прошлых экспериментах
+MAX_RERANK_TRAIN_QUERIES = 15000     # лимит обучающих запросов ре-ранкера (память)
 # Отложенные valid/test собираются "как бенчмарк": по одному запросу на текст,
 # и с той же долей "текст встречался в истории", что у бенчмарка (41%). В train
 # 354к запросов, но только 74к уникальных текстов, средняя длина 2.45 слова;
@@ -88,10 +91,10 @@ RERANK_VALID_N = 1500      # сколько запросов в valid (early sto
 RERANK_TEST_N = 1500       # сколько в test (итоговая честная цифра)
 
 # ---------------------------------------------------------------- пути
-TRAIN_EMB_DIR = "./retrieve_cache_train_v1"
-BENCH_EMB_DIR = "./retrieve_cache_benchmark_v1"      # из 02 в benchmark-режиме
-WORK_DIR = "./work_geo005"                       # сюда складываются пулы/признаки/модели v2
-MODELS_DIR = f"{WORK_DIR}/models"                 # все модели ансамбля + ensemble.json
+TRAIN_EMB_DIR = "./retrieve_cache_train_v3"
+BENCH_EMB_DIR = "./retrieve_cache_benchmark_v3"
+WORK_DIR = "./work_val10"
+MODELS_DIR = f"{WORK_DIR}/models"
 POSTPROC_PARAMS_PATH = f"{WORK_DIR}/postprocess_params.json"
 
 # ---------------------------------------------------------------- модели ранжирования

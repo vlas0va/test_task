@@ -1,0 +1,59 @@
+benchmark: queries=2452 items=189212
+[history] pairs=467054 items=344825 texts=68303 microcats=212 search_locs=2782 item_level=False
+[corpus] N=189212, BM25 (full + title) built in 59.9s
+[pool] queries=2452 активные каналы: ['bm25_global', 'bm25_geo', 'bm25_geo_filt', 'dense_global', 'dense_geo', 'dense_geo_filt']
+  [64/2452] rows=37982  avg pool=593/запрос  6s
+  [704/2452] rows=411608  avg pool=585/запрос  30s
+  [1344/2452] rows=780933  avg pool=581/запрос  48s
+  [1984/2452] rows=1156038  avg pool=583/запрос  64s
+[pool] готово: ./work_val10/pool_benchmark.parquet, строк 1430098 (583 на запрос), 77s
+ансамбль: ['lgb_lambdarank', 'lgb_binary', 'catboost_yetirank'], веса {'lgb_lambdarank': 0.5, 'lgb_binary': 1.0, 'catboost_yetirank': 1.0}
+
+средние признаков: train-пул vs benchmark-пул (сильные расхождения = повод задуматься)
+                        train_mean  bench_mean    ratio
+rank_bm25_global         8381.9823   8314.7486     0.99
+rank_bm25_geo            5667.5015   5762.2802     1.02
+rank_bm25_geo_filt       8862.2039   9399.0666     1.06
+rank_dense_global        8370.9222   8293.0908     0.99
+rank_dense_geo           5178.6979   4935.9816     0.95
+rank_dense_geo_filt      8862.2029   9399.0666     1.06
+n_channels                  1.4841      1.4054     0.95
+bm25                       17.1763     13.7251     0.80
+bm25_rel                    0.3518      0.2908     0.83
+bm25_rel_geo                0.4423      0.3304     0.75
+geo_supply_bm25             7.6570      7.0504     0.92
+geo_supply_filt             6.2385      6.2069     0.99
+n_bm25_hits_log            11.3894     10.3430     0.91
+cov_full                    0.4377      0.3880     0.89
+bm25_title                  3.3678      2.8174     0.84
+cov_title                   0.2591      0.1996     0.77
+filter_cov                  0.6943      0.6134     0.88
+filter_ok                   0.6085      0.5161     0.85
+cos                         0.3317      0.2824     0.85
+cos_minus_max              -0.3732     -0.3717     1.00
+cos_minus_max_geo          -0.3100     -0.3341     1.08
+location_match              0.4038      0.4714     1.17
+in_geo                      0.7430      0.7517     1.01
+geo_p                       0.4363      0.5018     1.15
+query_loc_has_items         0.8612      0.8265     0.96
+dist_km_log                 3.7738      3.5418     0.94
+query_loc_size              6.9246      6.4322     0.93
+item_loc_size               8.6045      7.8431     0.91
+search_category_is0         0.0001      0.0901  1405.49
+has_filter                  0.6190      0.3717     0.60
+q_ntok                      2.7700      3.2548     1.18
+item_rating                 4.8000      4.8065     1.00
+item_reviews_count          2.9952      2.9105     0.97
+item_price                  6.4595      6.4619     1.00
+item_phone_hidden           0.1237      0.1433     1.16
+item_message_forbidden      0.0243      0.0229     0.94
+title_len                  34.5456     34.5544     1.00
+desc_len                 1372.6334   1454.8315     1.06
+rating_ok                   0.9135         NaN      NaN
+hist_text_cnt               1.1846      0.3726     0.31
+hist_text_mc_share          0.3424      0.2853     0.83
+tok_mc_share                0.2027      0.1549     0.76
+tok_mc_is_top               0.3503      0.2894     0.83
+эвристики постобработки: {'quotas': {}, 'hard': [], 'diversity': {}}
+добито до 50: 0 позиций
+сохранено ./answer.csv: (2452, 2); среднее число id в строке: 50.0
