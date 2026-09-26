@@ -54,8 +54,12 @@ def build_train_corpus(ti, bi=None, ti_emb=None, bi_emb=None):
     emb = None
     if ti_emb is not None and bi_emb is not None:
         assert ti_emb.shape[1] == bi_emb.shape[1], "размерности эмбеддингов train/benchmark не совпадают"
-        emb = np.vstack([np.asarray(ti_emb, dtype=np.float32),
-                         np.asarray(bi_emb, dtype=np.float32)[np.nonzero(extra_mask.values)[0]]])
+        # заполняем итоговый массив прямо из mmap-файлов - без промежуточных копий
+        # (vstack держал в памяти ~2.5-3 ГБ одновременно, так - ровно 1.5 ГБ)
+        extra_idx = np.nonzero(extra_mask.values)[0]
+        emb = np.empty((len(ti_emb) + len(extra_idx), ti_emb.shape[1]), dtype=np.float32)
+        emb[:len(ti_emb)] = ti_emb
+        emb[len(ti_emb):] = bi_emb[extra_idx]
     print(f"[corpus] train_items={len(ti)} + доп. из benchmark={int(extra_mask.sum())} -> {len(items)}")
     return items, emb
 

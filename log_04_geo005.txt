@@ -1,0 +1,148 @@
+Default metric period is 5 because PFound, NDCG is/are not implemented for GPU
+Metric PFound is not implemented on GPU. Will use CPU for metric computation, this could significantly affect learning time
+Metric NDCG:top=50;type=Base is not implemented on GPU. Will use CPU for metric computation, this could significantly affect learning time
+[split] eval: 2148 (новых текстов 1258, виденных 890; доля виденных 0.41 vs бенчмарк 0.41) -> valid 1074 / test 1074;  train: 7477 -> 5752 после чистки
+[corpus] train_items=344825 + доп. из benchmark=171070 -> 515895
+[history] pairs=453239 items=336863 texts=67045 microcats=211 search_locs=2755 item_level=False
+[corpus] N=515895, BM25 (full + title) built in 191.1s
+[pool] queries=7900 активные каналы: ['bm25_global', 'bm25_geo', 'bm25_geo_filt', 'dense_global', 'dense_geo', 'dense_geo_filt']
+  [64/7900] rows=38043  avg pool=594/запрос  24s
+  [704/7900] rows=419752  avg pool=596/запрос  107s
+  [1344/7900] rows=803386  avg pool=598/запрос  159s
+  [1984/7900] rows=1186442  avg pool=598/запрос  210s
+  [2624/7900] rows=1571198  avg pool=599/запрос  257s
+  [3264/7900] rows=1957260  avg pool=600/запрос  302s
+  [3904/7900] rows=2342869  avg pool=600/запрос  349s
+  [4544/7900] rows=2728648  avg pool=600/запрос  395s
+  [5184/7900] rows=3117842  avg pool=601/запрос  443s
+  [5824/7900] rows=3505368  avg pool=602/запрос  489s
+  [6464/7900] rows=3896010  avg pool=603/запрос  534s
+  [7104/7900] rows=4286995  avg pool=603/запрос  578s
+  [7744/7900] rows=4679533  avg pool=604/запрос  619s
+[pool] готово: ./work_geo005/pool_train_F.parquet, строк 4774622 (604 на запрос), 630s
+pool: (4774622, 50), признаков: 43
+          size   sum
+split               
+test    657304  1113
+train  3460410  6536
+valid   656908  1149
+
+[valid] pool recall (потолок) = 0.9616  (средний пул 612)
+    bm25_global     top-50: 0.3071   весь канал: 0.3743
+    bm25_geo        top-50: 0.7062   весь канал: 0.8464
+    bm25_geo_filt   top-50: 0.3899   весь канал: 0.4491
+    dense_global    top-50: 0.2678   весь канал: 0.3718
+    dense_geo       top-50: 0.7865   весь канал: 0.9168
+    dense_geo_filt  top-50: 0.4268   весь канал: 0.4750
+    простой скор (bm25_rel_geo + cos + гео) recall@50: 0.7867
+    простой скор (bm25_rel_geo + cos + гео) recall@100: 0.8562
+    простой скор (bm25_rel_geo + cos + гео) recall@200: 0.8976
+    простой скор (bm25_rel_geo + cos + гео) recall@500: 0.9452
+
+[test] pool recall (потолок) = 0.9502  (средний пул 612)
+    bm25_global     top-50: 0.2556   весь канал: 0.3405
+    bm25_geo        top-50: 0.6622   весь канал: 0.8260
+    bm25_geo_filt   top-50: 0.3748   весь канал: 0.4427
+    dense_global    top-50: 0.2402   весь канал: 0.3250
+    dense_geo       top-50: 0.7605   весь канал: 0.9022
+    dense_geo_filt  top-50: 0.4115   весь канал: 0.4689
+    простой скор (bm25_rel_geo + cos + гео) recall@50: 0.7675
+    простой скор (bm25_rel_geo + cos + гео) recall@100: 0.8355
+    простой скор (bm25_rel_geo + cos + гео) recall@200: 0.8796
+    простой скор (bm25_rel_geo + cos + гео) recall@500: 0.9306
+Training until validation scores don't improve for 100 rounds
+Early stopping, best iteration is:
+[83]	valid_0's ndcg@50: 0.550397
+[models] lgb_lambdarank: 32s
+Training until validation scores don't improve for 100 rounds
+[200]	valid_0's auc: 0.978284
+Early stopping, best iteration is:
+[235]	valid_0's auc: 0.978454
+[models] lgb_binary: 44s
+0:	test: 0.3331718	best: 0.3331718 (0)	total: 248ms	remaining: 6m 11s
+200:	test: 0.5279136	best: 0.5285228 (198)	total: 24s	remaining: 2m 35s
+400:	test: 0.5345158	best: 0.5347037 (396)	total: 47.4s	remaining: 2m 9s
+600:	test: 0.5376070	best: 0.5385118 (553)	total: 1m 10s	remaining: 1m 46s
+800:	test: 0.5403892	best: 0.5405192 (792)	total: 1m 34s	remaining: 1m 22s
+bestTest = 0.5408706648
+bestIteration = 822
+Shrink model to first 823 iterations.
+[models] catboost_yetirank: 118s
+rank_dense_geo            370949.0
+rank_bm25_geo              69921.0
+cos_minus_max_geo          63583.0
+dist_km_log                43376.0
+geo_p                      34046.0
+item_loc_size              30455.0
+cos_minus_max              18218.0
+n_channels                 14234.0
+bm25_rel_geo                7599.0
+cos                         5579.0
+query_loc_size              4704.0
+bm25_title                  4345.0
+cov_full                    4217.0
+rank_dense_geo_filt         3824.0
+hist_text_mc_share          3797.0
+bm25                        2770.0
+rank_bm25_global            2634.0
+tok_mc_share                2597.0
+desc_len                    2525.0
+item_reviews_count          2466.0
+geo_supply_bm25             2281.0
+bm25_rel                    2248.0
+rank_dense_global           2213.0
+item_rating                 2206.0
+title_len                   2134.0
+geo_supply_filt             1812.0
+hist_text_cnt               1760.0
+item_price                  1696.0
+n_bm25_hits_log             1555.0
+rank_bm25_geo_filt          1388.0
+query_loc_has_items         1211.0
+location_match               843.0
+filter_ok                    746.0
+filter_cov                   448.0
+cov_title                    285.0
+in_geo                       171.0
+q_ntok                       163.0
+tok_mc_is_top                101.0
+item_phone_hidden             71.0
+has_filter                    60.0
+item_message_forbidden        12.0
+search_category_is0            0.0
+rating_ok                      0.0
+[ensemble] лучшие веса на valid: {'lgb_lambdarank': 2.0, 'lgb_binary': 1.0, 'catboost_yetirank': 0.5} -> recall@50 0.8894
+
+TEST recall@50:
+  bm25+40*loc (v1 baseline)        0.7045
+  lgb_lambdarank                   0.8534
+  lgb_binary                       0.8517
+  catboost_yetirank                0.8434
+  АНСАМБЛЬ                         0.8566
+  потолок пула                     0.9502
+[postprocess] без эвристик: recall@50 = 0.8894
+[postprocess] итог на valid: 0.8894  params={'quotas': {}, 'hard': [], 'diversity': {}}
+TEST: ансамбль 0.8566 -> с эвристиками 0.8566
+              mean  size
+has_filter              
+False       0.8330   458
+True        0.8742   616 
+
+           mean  size
+q_words              
+1        0.8554    83
+2        0.8613   346
+3        0.8708   329
+4        0.8198   197
+5        0.8655   119 
+
+                 mean  size
+loc_has_items              
+0              0.7484   161
+1              0.8757   913 
+
+         mean  size
+cat0               
+False  0.8566  1074 
+
+сохранено: ./work_geo005/models ./work_geo005/postprocess_params.json ./work_geo005/eval_scores.parquet

@@ -47,7 +47,7 @@ CHANNELS = dict(
     hist_text=100,     # только при USE_ITEM_HISTORY
     pop_geo=50,        # только при USE_ITEM_HISTORY
 )
-GEO_MIN_P = 0.02
+GEO_MIN_P = 0.005
 BATCH_QUERIES = 64   # запросов за один проход (пиковая RAM ~1.5-2 ГБ на train-корпусе); 32 - если не хватает
 
 # ---------------------------------------------------------------- история (train как "лог кликов")
@@ -90,7 +90,7 @@ RERANK_TEST_N = 1500       # сколько в test (итоговая честн
 # ---------------------------------------------------------------- пути
 TRAIN_EMB_DIR = "./retrieve_cache_train_v1"
 BENCH_EMB_DIR = "./retrieve_cache_benchmark_v1"      # из 02 в benchmark-режиме
-WORK_DIR = "./work_v2"                             # сюда складываются пулы/признаки/модели v2
+WORK_DIR = "./work_geo005"                           # сюда складываются пулы/признаки/модели v2
 MODELS_DIR = f"{WORK_DIR}/models"                 # все модели ансамбля + ensemble.json
 POSTPROC_PARAMS_PATH = f"{WORK_DIR}/postprocess_params.json"
 

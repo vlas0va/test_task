@@ -325,7 +325,7 @@ def build_pool_features(corpus: CorpusIndex, queries: pd.DataFrame, query_emb: n
         geo_row_max = np.where(in_geo, S, 0).max(axis=1)
         f["bm25"] = bm
         f["bm25_rel"] = bm / np.maximum(row_max[qloc], 1e-6)
-        f["bm25_rel_geo"] = bm / np.maximum(geo_row_max[qloc], 1e-6)
+        f["bm25_rel_geo"] = np.where(geo_row_max[qloc] > 0, bm / np.maximum(geo_row_max[qloc], 1e-6), np.nan)
         geo_supply = (has_bm & in_geo).sum(axis=1)
         f["geo_supply_bm25"] = np.log1p(geo_supply[qloc]).astype(np.float32)
         f["geo_supply_filt"] = np.log1p((has_bm & in_geo & filt_ok).sum(axis=1)[qloc]).astype(np.float32)

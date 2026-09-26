@@ -8,3 +8,16 @@ retrieve_cache_train*/
 retrieve_cache_benchmark*/
 *.parquet
 answer*.csv
+# большие артефакты - не храним в git
+biencoder_finetuned*/
+biencoder_hardneg*/
+embed_cache*/
+head_checkpoints*/
+retrieve_cache*/
+catboost_info/
+work_*/
+runs/
+*.parquet
+*.npy
+*.zip
+answer*.csv

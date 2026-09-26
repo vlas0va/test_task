@@ -30,7 +30,7 @@ POOL_PATH = f"{C.WORK_DIR}/pool_benchmark_simple.parquet"
 
 
 def simple_score(d: pd.DataFrame, w=C.SIMPLE_SCORE_WEIGHTS):
-    s = d["bm25_rel_geo"].values + w["geo_p"] * d["geo_p"].values + 2.0 * d["in_geo"].values
+    s = np.nan_to_num(d["bm25_rel_geo"].values, nan=0.0) + w["geo_p"] * d["geo_p"].values + 2.0 * d["in_geo"].values
     s = s + w["cov_title"] * d["cov_title"].values
     s = s + w["filter_ok"] * np.nan_to_num(d["filter_ok"].values, nan=1.0)
     if "cos" in d.columns:   # если есть эмбеддинги - добавляем косинус (вес не подбирался, 1.0)

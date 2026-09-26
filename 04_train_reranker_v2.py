@@ -116,7 +116,7 @@ for part in ("valid", "test"):
         if col in d:
             print(f"    {ch:15s} top-50: {pool_recall(q, y, nr, d[col].values < 50):.4f}"
                   f"   весь канал: {pool_recall(q, y, nr, d[col].values < NO_RANK):.4f}")
-    simple = d["bm25_rel_geo"].values + 2 * d["in_geo"].values + (d["cos"].values if "cos" in d else 0)
+    simple = np.nan_to_num(d["bm25_rel_geo"].values, nan=0.0) + 2 * d["in_geo"].values + (d["cos"].values if "cos" in d else 0)
     for k in (50, 100, 200, 500):
         print(f"    простой скор (bm25_rel_geo + cos + гео) recall@{k}: {recall_at_k(q, simple, y, nr, k):.4f}")
 
