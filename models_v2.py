@@ -58,6 +58,14 @@ class Ranker:
         m.load_model(path)
         return Ranker(name, m, "cat")
 
+def _cap_groups(d, max_rows):
+    """CatBoost на GPU не принимает запросы длиннее 1023 строк. Оставляем в каждом
+    запросе все позитивы + лучших кандидатов по min-рангу среди каналов (худшие
+    негативы отбрасываются только для обучения CatBoost; порядок строк сохраняется)."""
+    rank_cols = [c for c in d.columns if c.startswith("rank_") and not c.startswith("rank_model_")]
+    key = d[rank_cols].min(axis=1) - 1e6 * d["label"]
+    pos_in_group = key.groupby(d["qrow"].values).rank(method="first").values
+    return d[pos_in_group <= max_rows]
 
 def train_one(name, tr, va, feats, task_type="CPU"):
     t0 = time.time()
@@ -85,7 +93,9 @@ def train_one(name, tr, va, feats, task_type="CPU"):
         except ImportError:
             print("[models] catboost не установлен (uv add catboost) - пропускаю catboost_yetirank")
             return None
-        ptr = Pool(tr[feats], label=tr["label"], group_id=tr["qrow"].values)
+        if task_type == "GPU":
+            tr, va = _cap_groups(tr, 1000), _cap_groups(va, 1000)
+        ptr = Pool(tr[feats], label=tr["label"], group_id=tr["qrow"].values)        
         pva = Pool(va[feats], label=va["label"], group_id=va["qrow"].values)
         # на CPU YetiRank на ~5 млн строк - десятки минут; на GPU (task_type="GPU") в разы быстрее
         m = CatBoostRanker(loss_function="YetiRank", eval_metric="NDCG:top=50", iterations=1500,

@@ -39,10 +39,10 @@ BM25_TITLE_KW = dict(k1=1.2, b=0.3, min_df=2)  # отдельный индекс
 # (по train у 98% выбранных объявлений эта пара есть в параметрах).
 CHANNELS = dict(
     bm25_global=100,
-    bm25_geo=300,
+    bm25_geo=500,
     bm25_geo_filt=150,
     dense_global=100,
-    dense_geo=300,
+    dense_geo=500,
     dense_geo_filt=150,
     hist_text=100,     # только при USE_ITEM_HISTORY
     pop_geo=50,        # только при USE_ITEM_HISTORY
@@ -90,7 +90,7 @@ RERANK_TEST_N = 1500       # сколько в test (итоговая честн
 # ---------------------------------------------------------------- пути
 TRAIN_EMB_DIR = "./retrieve_cache_train_v1"
 BENCH_EMB_DIR = "./retrieve_cache_benchmark_v1"      # из 02 в benchmark-режиме
-WORK_DIR = "./work_geo005"                           # сюда складываются пулы/признаки/модели v2
+WORK_DIR = "./work_geo005_wide"                        # сюда складываются пулы/признаки/модели v2
 MODELS_DIR = f"{WORK_DIR}/models"                 # все модели ансамбля + ensemble.json
 POSTPROC_PARAMS_PATH = f"{WORK_DIR}/postprocess_params.json"
 

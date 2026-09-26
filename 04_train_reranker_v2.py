@@ -88,8 +88,13 @@ for r, p in zip(uid_to_row.reindex(fp["query_uid"]).values, pos_of.reindex(fp["i
 n_rel = pd.Series({r: len(s) for r, s in positives.items()}).reindex(range(len(fq))).fillna(0).astype(int)
 
 POOL_PATH = f"{C.WORK_DIR}/pool_train_F.parquet"
-build_pool_features(corpus, fq, fq_emb, POOL_PATH, C.CHANNELS, C.BATCH_QUERIES,
-                    positives=positives, geo_min_p=C.GEO_MIN_P)
+if os.path.exists(POOL_PATH):
+    # пул уже посчитан в этом WORK_DIR - не пересчитываем
+    # (если меняли каналы/признаки/GEO_MIN_P - удалите файл или смените WORK_DIR)
+    print(f"[pool] {POOL_PATH} уже есть - переиспользую")
+else:
+    build_pool_features(corpus, fq, fq_emb, POOL_PATH, C.CHANNELS, C.BATCH_QUERIES,
+                        positives=positives, geo_min_p=C.GEO_MIN_P)
 del corpus, item_emb
 gc.collect()
 
