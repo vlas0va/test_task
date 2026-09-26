@@ -219,3 +219,194 @@ def build_embedding_item_text(df: pd.DataFrame, use_summary: pd.Series = None,
         body = params.str.cat(desc, sep=". ", na_rep="")
     text = titles.str.cat(body, sep=". ", na_rep="")
     return text.map(lambda s: _SPACE_RE.sub(" ", s).strip())
+
+
+# ============================================================================
+# v2: дополнения (используются в retrieval_v2.py / features_v2.py)
+# ============================================================================
+
+_RATING_RE = re.compile(r"рейтинг[^0-9]{0,40}?(\d+(?:[.,]\d+)?)", re.IGNORECASE)
+# целиком фраза фильтра по рейтингу - это не "смысл" запроса, в BM25 она только шумит
+_RATING_PHRASE_RE = re.compile(
+    r"рейтинг\s+пользователя\s*\d+(?:[.,]\d+)?\s*звезд\w*(?:\s+и\s+выше)?", re.IGNORECASE)
+# служебные слова фильтров ("Вид услуги X", "Тип услуги Y") - оставляем только значения X, Y
+_FILTER_STOP = {"вид", "услуги", "услуга", "тип", "и", "выше", "звезды", "звезд", "рейтинг",
+                "пользователя", "не", "важно", "любой", "любая", "любое"}
+
+
+def parse_rating_threshold(s) -> float:
+    """'Рейтинг пользователя 4 звезды и выше' -> 4.0; нет фильтра -> nan."""
+    s = _safe_str(s)
+    if not s:
+        return float("nan")
+    m = _RATING_RE.search(s)
+    if not m:
+        return float("nan")
+    try:
+        return float(m.group(1).replace(",", "."))
+    except ValueError:
+        return float("nan")
+
+
+def clean_filter_text(s) -> str:
+    """Текст фильтров без фразы про рейтинг и без служебных слов -
+    остаются только содержательные значения ('красота здоровье')."""
+    s = _safe_str(s)
+    if not s:
+        return ""
+    s = _RATING_PHRASE_RE.sub(" ", s)
+    toks = [t for t in normalize_text(s).split() if t not in _FILTER_STOP and not t.isdigit()]
+    return " ".join(toks)
+
+
+def build_query_text_v2(df: pd.DataFrame, query_repeat: int = 2) -> pd.Series:
+    """Как build_query_text, но фильтры очищены (без 'рейтинг пользователя 4
+    звезды и выше' - эти слова раньше искались в текстах объявлений как
+    обычные слова запроса и добавляли шум в BM25)."""
+    q = df["search_query"].fillna("").map(normalize_text)
+    filt = df["search_infm_params_text"].map(clean_filter_text)
+    text = (q + " ") * query_repeat + filt
+    return text.map(lambda s: _SPACE_RE.sub(" ", s).strip())
+
+
+def query_only_text(df: pd.DataFrame) -> pd.Series:
+    """Только сам текст запроса (для признаков покрытия слов запроса)."""
+    return df["search_query"].fillna("").map(normalize_text)
+
+
+def filter_only_text(df: pd.DataFrame) -> pd.Series:
+    return df["search_infm_params_text"].map(clean_filter_text)
+
+
+def query_key_series(df: pd.DataFrame) -> pd.Series:
+    """Ключ 'одинаковый запрос' для истории: множество стемов слов запроса,
+    отсортированное. 'скупка телевизоров' == 'телевизор скупка' == 'скупка телевизора'."""
+    stemmed = list(stemming_generator(df["search_query"].fillna("").map(normalize_text)))
+    return pd.Series([" ".join(sorted(set(s.split()))) for s in stemmed], index=df.index)
+
+
+def iter_title_texts(df: pd.DataFrame):
+    for t in df["item_title_raw"]:
+        yield normalize_text(_safe_str(t))
+
+
+def iter_params_texts(df: pd.DataFrame, maxlen: int = 400):
+    for t in df["item_infm_params_text"]:
+        yield normalize_text(_safe_str(t)[:maxlen])
+
+
+# ---------------------------------------------------------------------------
+# Структурированный текст для эмбеддингов (идея "Услуга: ...; Вид услуги: ...;
+# Описание: первые N слов"). Числа (рейтинг, отзывы, цена) и локацию сюда
+# СОЗНАТЕЛЬНО НЕ добавляем: в запросе их нет, косинус между "автоподбор" и
+# "Рейтинг: 4.8" ничего полезного не даст - они идут числовыми признаками в
+# LightGBM, где работают гораздо лучше.
+# ---------------------------------------------------------------------------
+_PARAM_SPLIT_RE = re.compile(r"[;\n|]+")
+
+
+def _param_values(params: str, max_chars: int = 200) -> str:
+    """Из 'Вид услуги Ремонт; Тип услуги Сантехника; ...' оставляем короткие
+    пары ключ-значение (длинные куски типа прайс-листов отбрасываем)."""
+    params = _safe_str(params)
+    if not params:
+        return ""
+    parts = [p.strip() for p in _PARAM_SPLIT_RE.split(params) if p.strip()]
+    parts = [p for p in parts if len(p) <= 80]  # длинные куски - обычно прайс/график
+    out = "; ".join(parts)
+    return out[:max_chars]
+
+
+def _first_words(s: str, n: int) -> str:
+    s = _safe_str(s)
+    if not s:
+        return ""
+    return " ".join(s.split()[:n])
+
+
+def build_embedding_item_text_structured(df: pd.DataFrame, desc_words: int = 40,
+                                          params_chars: int = 200) -> pd.Series:
+    """'Услуга: <заголовок>. Параметры: <вид/тип>. Описание: <первые N слов>'."""
+    out = []
+    for t, p, d in df[["item_title_raw", "item_infm_params_text", "item_description_raw"]].itertuples(index=False, name=None):
+        s = f"Услуга: {_safe_str(t)[:150]}."
+        pv = _param_values(p, params_chars)
+        if pv:
+            s += f" Параметры: {pv}."
+        dw = _first_words(d, desc_words)
+        if dw:
+            s += f" Описание: {dw}"
+        out.append(_SPACE_RE.sub(" ", s).strip())
+    return pd.Series(out, index=df.index)
+
+
+def build_item_keywords(df: pd.DataFrame, top_n: int = 12, min_df: int = 3) -> pd.Series:
+    """
+    Дешёвая альтернатива LLM-суммаризации: 'ключевые слова' объявления =
+    заголовок + top_n слов описания/параметров с максимальным TF-IDF (слова,
+    характерные именно для этого объявления, а не общие 'качественно, недорого').
+    Считается на CPU за минуты для всего корпуса. Результат можно подать в
+    эмбеддер вместо длинного описания: 'passage: <заголовок>. <ключевые слова>'.
+    """
+    from sklearn.feature_extraction.text import TfidfVectorizer
+    import numpy as np
+    body = [normalize_text(_safe_str(p)[:600] + " " + _safe_str(d)[:1500])
+            for p, d in df[["item_infm_params_text", "item_description_raw"]].itertuples(index=False, name=None)]
+    vec = TfidfVectorizer(min_df=min_df, max_df=0.2, token_pattern=r"(?u)\b[а-яa-z]{3,}\b", sublinear_tf=True)
+    X = vec.fit_transform(body).tocsr()
+    vocab = np.array(vec.get_feature_names_out())
+    kws = []
+    for i in range(X.shape[0]):
+        s, e = X.indptr[i], X.indptr[i + 1]
+        if e == s:
+            kws.append("")
+            continue
+        data, idx = X.data[s:e], X.indices[s:e]
+        top = idx[np.argsort(-data)[:top_n]]
+        kws.append(" ".join(vocab[top]))
+    titles = df["item_title_raw"].map(lambda x: _safe_str(x)[:150])
+    return pd.Series([f"{t}. {k}".strip() for t, k in zip(titles, kws)], index=df.index)
+
+
+def build_item_text_for_embedding(df: pd.DataFrame, use_summary: pd.Series = None) -> pd.Series:
+    """ЕДИНАЯ точка входа для 01 и 02: текст объявления для эмбеддера по
+    настройкам config_v2 (EMB_TEXT_MODE, EMB_ITEM_TEXT_KW). Так обучение головы
+    и применение модели гарантированно видят один и тот же формат текста."""
+    import config_v2 as C
+    if use_summary is None and getattr(C, "EMB_TEXT_MODE", "plain") == "structured":
+        return build_embedding_item_text_structured(df)
+    return build_embedding_item_text(df, use_summary=use_summary, **C.EMB_ITEM_TEXT_KW)
+
+
+# ---------------------------------------------------------------------------
+# Разбор фильтров поиска "ключ значение ключ значение ..." (без разделителей).
+# По train (00_diagnostics): у выбранных объявлений в параметрах есть ровно
+# та же пара "Вид услуги <значение>" в 98.3% случаев, "Тип услуги <значение>" -
+# в 95.5%, "Тип услуги автосервиса" - 95%, "Предмет или специальность" - 84%.
+# Остальные ключи ("Кто оказывает услуги", "Онлайн-запись", "Срочная услуга")
+# в параметрах объявления не отражаются - их не проверяем.
+# ---------------------------------------------------------------------------
+FILTER_KEYS = ["Тип услуги автосервиса", "Вид услуги", "Тип услуги", "Кто оказывает услуги",
+               "Онлайн-запись", "Срочная услуга", "Предмет или направление", "Предмет или специальность",
+               "Аренда авто", "Поиск по слотам", "Рейтинг пользователя"]
+CHECKABLE_FILTER_KEYS = ("Вид услуги", "Тип услуги", "Тип услуги автосервиса", "Предмет или специальность")
+_FKEY_RE = re.compile("(" + "|".join(sorted(map(re.escape, FILTER_KEYS), key=len, reverse=True)) + ")")
+
+
+def parse_filter_pairs(s) -> list:
+    """'Тип услуги Услуги парикмахера Вид услуги Красота, здоровье' ->
+    [('Тип услуги', 'Услуги парикмахера'), ('Вид услуги', 'Красота, здоровье')]"""
+    s = _safe_str(s)
+    if not s:
+        return []
+    parts = _FKEY_RE.split(s)
+    out = []
+    for i in range(1, len(parts), 2):
+        v = parts[i + 1].strip() if i + 1 < len(parts) else ""
+        out.append((parts[i], v))
+    return out
+
+
+def checkable_filters(s) -> list:
+    """Только пары, которые можно проверить по параметрам объявления, как 'ключ значение' в нижнем регистре."""
+    return [f"{k} {v}".lower() for k, v in parse_filter_pairs(s) if k in CHECKABLE_FILTER_KEYS and v]
