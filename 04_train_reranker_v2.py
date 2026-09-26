@@ -31,7 +31,7 @@ from text_prep import query_key_series
 
 
 os.makedirs(C.WORK_DIR, exist_ok=True)
-NEG_KEEP = 1.0   # доля негативов в ОБУЧЕНИИ (0.5 = в 2 раза меньше RAM); valid/test не трогаем
+NEG_KEEP = 0.5   # доля негативов в ОБУЧЕНИИ (0.5 = в 2 раза меньше RAM); valid/test не трогаем
 
 # %% данные и разбиение
 tq, ti, tp = load_train()
@@ -111,6 +111,14 @@ pool = pd.read_parquet(POOL_PATH)
 row_split = np.where(fq["query_uid"].isin(set(va_uids)), "valid",
                      np.where(fq["query_uid"].isin(set(te_uids)), "test", "train"))
 pool["split"] = row_split[pool["qrow"].values]
+# прореживаем негативы TRAIN сразу после загрузки, до всех копий (экономия памяти);
+# valid/test не трогаем - оценка остаётся честной
+if NEG_KEEP < 1.0:
+    rng = np.random.default_rng(0)
+    drop = (pool["split"].values == "train") & (pool["label"].values == 0) & (rng.random(len(pool)) >= NEG_KEEP)
+    pool = pool[~drop].reset_index(drop=True)
+    del drop
+    gc.collect()
 add_helper_cols(pool)
 FEATS = [c for c in feature_columns(pool) if c not in C.DROP_FEATURES and c not in ("rev_bucket", "mc_plausible")]
 print(f"pool: {pool.shape}, признаков: {len(FEATS)}")
@@ -136,9 +144,7 @@ for part in ("valid", "test"):
 # %% обучение N моделей
 tr = pool[pool["split"] == "train"]
 tr = tr[tr.groupby("qrow")["label"].transform("max") > 0]      # lambdarank нечему учиться без позитивов
-if NEG_KEEP < 1.0:
-    rng = np.random.default_rng(0)
-    tr = tr[(tr["label"] == 1) | (rng.random(len(tr)) < NEG_KEEP)]
+
 va = pool[pool["split"] == "valid"]
 va_fit = va[va.groupby("qrow")["label"].transform("max") > 0]
 rankers = []

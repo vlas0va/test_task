@@ -1,0 +1,17 @@
+Default metric period is 5 because PFound is/are not implemented for GPU
+Metric PFound is not implemented on GPU. Will use CPU for metric computation, this could significantly affect learning time
+Metric PFound is not implemented on GPU. Will use CPU for metric computation, this could significantly affect learning time
+итерации проверенного прогона: {'lgb_lambdarank': 225, 'lgb_binary': 498, 'catboost_yetirank': 1233}  веса: {'lgb_lambdarank': 0.5, 'lgb_binary': 0.5, 'catboost_yetirank': 2.0}
+обучение на 20127 запросах, 6162289 строк
+[refit] lgb_lambdarank: 247 итераций
+[refit] lgb_binary: 547 итераций
+[refit] catboost_yetirank: 1356 итераций
+0:	total: 220ms	remaining: 4m 57s
+200:	total: 32s	remaining: 3m 3s
+400:	total: 1m 6s	remaining: 2m 39s
+600:	total: 1m 36s	remaining: 2m 1s
+800:	total: 2m 6s	remaining: 1m 27s
+1000:	total: 2m 40s	remaining: 56.8s
+1200:	total: 3m 10s	remaining: 24.6s
+1355:	total: 3m 33s	remaining: 0us
+сохранено: ./work_val10_all/models_refit -> в config_v2: MODELS_DIR = f"{WORK_DIR}/models_refit"

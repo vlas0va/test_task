@@ -1,0 +1,173 @@
+Default metric period is 5 because PFound, NDCG is/are not implemented for GPU
+Metric PFound is not implemented on GPU. Will use CPU for metric computation, this could significantly affect learning time
+Metric NDCG:top=50;type=Base is not implemented on GPU. Will use CPU for metric computation, this could significantly affect learning time
+[split] eval: 2148 (новых текстов 1258, виденных 890; доля виденных 0.41 vs бенчмарк 0.41) -> valid 1074 / test 1074;  train: 7477 -> 5752 после чистки
+[split] train ре-ранкера: 29403 -> 18786 после чистки/лимита
+[corpus] train_items=344825 + доп. из benchmark=171070 -> 515895
+[history] pairs=420876 items=317820 texts=64031 microcats=210 search_locs=2710 item_level=False
+[corpus] N=515895, BM25 (full + title) built in 145.6s
+[pool] queries=20934 активные каналы: ['bm25_global', 'bm25_geo', 'bm25_geo_filt', 'dense_global', 'dense_geo', 'dense_geo_filt']
+  [64/20934] rows=37520  avg pool=586/запрос  20s
+  [704/20934] rows=423967  avg pool=602/запрос  87s
+  [1344/20934] rows=810575  avg pool=603/запрос  137s
+  [1984/20934] rows=1199896  avg pool=605/запрос  179s
+  [2624/20934] rows=1583371  avg pool=603/запрос  221s
+  [3264/20934] rows=1974119  avg pool=605/запрос  261s
+  [3904/20934] rows=2363955  avg pool=606/запрос  304s
+  [4544/20934] rows=2756178  avg pool=607/запрос  342s
+  [5184/20934] rows=3148943  avg pool=607/запрос  381s
+  [5824/20934] rows=3538658  avg pool=608/запрос  420s
+  [6464/20934] rows=3929432  avg pool=608/запрос  460s
+  [7104/20934] rows=4320094  avg pool=608/запрос  498s
+  [7744/20934] rows=4713573  avg pool=609/запрос  539s
+  [8384/20934] rows=5102722  avg pool=609/запрос  577s
+  [9024/20934] rows=5495115  avg pool=609/запрос  617s
+  [9664/20934] rows=5888428  avg pool=609/запрос  655s
+  [10304/20934] rows=6279298  avg pool=609/запрос  696s
+  [10944/20934] rows=6667152  avg pool=609/запрос  734s
+  [11584/20934] rows=7057301  avg pool=609/запрос  774s
+  [12224/20934] rows=7449919  avg pool=609/запрос  813s
+  [12864/20934] rows=7841436  avg pool=610/запрос  852s
+  [13504/20934] rows=8233278  avg pool=610/запрос  893s
+  [14144/20934] rows=8623381  avg pool=610/запрос  931s
+  [14784/20934] rows=9014631  avg pool=610/запрос  969s
+  [15424/20934] rows=9407744  avg pool=610/запрос  1009s
+  [16064/20934] rows=9800461  avg pool=610/запрос  1047s
+  [16704/20934] rows=10192726  avg pool=610/запрос  1085s
+  [17344/20934] rows=10587165  avg pool=610/запрос  1125s
+  [17984/20934] rows=10977865  avg pool=610/запрос  1164s
+  [18624/20934] rows=11369372  avg pool=610/запрос  1203s
+  [19264/20934] rows=11759353  avg pool=610/запрос  1241s
+  [19904/20934] rows=12154355  avg pool=611/запрос  1281s
+  [20544/20934] rows=12548414  avg pool=611/запрос  1319s
+[pool] готово: ./work_val10_all/pool_train_F.parquet, строк 12788534 (611 на запрос), 1344s
+pool: (7064970, 50), признаков: 43
+          size    sum
+split                
+test    661563   1110
+train  5742979  20190
+valid   660428   1149
+
+[valid] pool recall (потолок) = 0.9611  (средний пул 615)
+    bm25_global     top-50: 0.3071   весь канал: 0.3743
+    bm25_geo        top-50: 0.7071   весь канал: 0.8455
+    bm25_geo_filt   top-50: 0.3894   весь канал: 0.4491
+    dense_global    top-50: 0.2673   весь канал: 0.3712
+    dense_geo       top-50: 0.7860   весь канал: 0.9173
+    dense_geo_filt  top-50: 0.4200   весь канал: 0.4770
+    простой скор (bm25_rel_geo + cos + гео) recall@50: 0.7870
+    простой скор (bm25_rel_geo + cos + гео) recall@100: 0.8506
+    простой скор (bm25_rel_geo + cos + гео) recall@200: 0.9037
+    простой скор (bm25_rel_geo + cos + гео) recall@500: 0.9424
+
+[test] pool recall (потолок) = 0.9474  (средний пул 616)
+    bm25_global     top-50: 0.2556   весь канал: 0.3405
+    bm25_geo        top-50: 0.6696   весь канал: 0.8269
+    bm25_geo_filt   top-50: 0.3785   весь канал: 0.4437
+    dense_global    top-50: 0.2454   весь канал: 0.3521
+    dense_geo       top-50: 0.7773   весь канал: 0.9004
+    dense_geo_filt  top-50: 0.4212   весь канал: 0.4697
+    простой скор (bm25_rel_geo + cos + гео) recall@50: 0.7737
+    простой скор (bm25_rel_geo + cos + гео) recall@100: 0.8383
+    простой скор (bm25_rel_geo + cos + гео) recall@200: 0.8917
+    простой скор (bm25_rel_geo + cos + гео) recall@500: 0.9306
+Training until validation scores don't improve for 100 rounds
+[200]	valid_0's ndcg@50: 0.564314
+Early stopping, best iteration is:
+[225]	valid_0's ndcg@50: 0.566084
+[models] lgb_lambdarank: 83s
+Training until validation scores don't improve for 100 rounds
+[200]	valid_0's auc: 0.981318
+[400]	valid_0's auc: 0.981749
+Early stopping, best iteration is:
+[498]	valid_0's auc: 0.981805
+[models] lgb_binary: 106s
+0:	test: 0.3585392	best: 0.3585392 (0)	total: 243ms	remaining: 6m 4s
+200:	test: 0.5356801	best: 0.5356801 (200)	total: 28.9s	remaining: 3m 6s
+400:	test: 0.5421660	best: 0.5421660 (400)	total: 57.4s	remaining: 2m 37s
+600:	test: 0.5445639	best: 0.5447074 (576)	total: 1m 26s	remaining: 2m 9s
+800:	test: 0.5469754	best: 0.5476388 (794)	total: 1m 54s	remaining: 1m 40s
+1000:	test: 0.5503514	best: 0.5505754 (995)	total: 2m 23s	remaining: 1m 11s
+1200:	test: 0.5545506	best: 0.5545572 (1197)	total: 2m 52s	remaining: 42.9s
+bestTest = 0.5551758439
+bestIteration = 1232
+Shrink model to first 1233 iterations.
+[models] catboost_yetirank: 204s
+rank_dense_geo            1006295.0
+rank_bm25_geo              243360.0
+cos_minus_max_geo          187523.0
+dist_km_log                121647.0
+item_loc_size               80750.0
+geo_p                       67363.0
+n_channels                  63673.0
+cos_minus_max               42401.0
+bm25_rel_geo                34262.0
+query_loc_size              24904.0
+cos                         18033.0
+location_match              17714.0
+cov_full                    14829.0
+bm25_rel                    14193.0
+rank_bm25_global            13474.0
+desc_len                    11173.0
+tok_mc_share                10840.0
+rank_dense_global            8152.0
+hist_text_mc_share           7529.0
+bm25_title                   7008.0
+item_reviews_count           6985.0
+filter_ok                    5871.0
+item_rating                  4827.0
+title_len                    4536.0
+item_price                   4413.0
+hist_text_cnt                4314.0
+geo_supply_bm25              4298.0
+bm25                         3869.0
+query_loc_has_items          3475.0
+geo_supply_filt              3381.0
+n_bm25_hits_log              3223.0
+rank_dense_geo_filt          2579.0
+rank_bm25_geo_filt           2098.0
+filter_cov                   1270.0
+cov_title                    1255.0
+q_ntok                        534.0
+item_phone_hidden             509.0
+tok_mc_is_top                 339.0
+item_message_forbidden        230.0
+has_filter                    109.0
+rating_ok                      35.0
+in_geo                          0.0
+search_category_is0             0.0
+[ensemble] лучшие веса на valid: {'lgb_lambdarank': 0.5, 'lgb_binary': 0.5, 'catboost_yetirank': 2.0} -> recall@50 0.8938
+
+TEST recall@50:
+  bm25+40*loc (v1 baseline)        0.7045
+  lgb_lambdarank                   0.8674
+  lgb_binary                       0.8607
+  catboost_yetirank                0.8604
+  АНСАМБЛЬ                         0.8632
+  потолок пула                     0.9474
+[postprocess] без эвристик: recall@50 = 0.8938
+[postprocess] итог на valid: 0.8938  params={'quotas': {}, 'hard': [], 'diversity': {}}
+TEST: ансамбль 0.8632 -> с эвристиками 0.8632
+              mean  size
+has_filter              
+False       0.8398   458
+True        0.8805   616 
+
+           mean  size
+q_words              
+1        0.8675    83
+2        0.8595   346
+3        0.8850   329
+4        0.8401   197
+5        0.8487   119 
+
+                 mean  size
+loc_has_items              
+0              0.7671   161
+1              0.8801   913 
+
+         mean  size
+cat0               
+False  0.8632  1074 
+
+сохранено: ./work_val10_all/models ./work_val10_all/postprocess_params.json ./work_val10_all/eval_scores.parquet
