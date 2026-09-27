@@ -49,7 +49,7 @@ def main():
     history = HistoryStats().fit(tq, tp, meta, item_level=C.USE_ITEM_HISTORY)
     del tq, ti, tp, meta
 
-    corpus = CorpusIndex(bi, item_emb=bi_emb, history=history)
+    corpus = CorpusIndex(bi, item_emb=bi_emb, history=history, emb2_prefer="bench")
     build_pool_features(corpus, bq, bq_emb, BENCH_POOL_PATH, C.CHANNELS, C.BATCH_QUERIES, geo_min_p=C.GEO_MIN_P)
     del corpus
     bi = bi[["item_id", "item_location_id", "item_rating_reviews_count"]]

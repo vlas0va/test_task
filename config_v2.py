@@ -44,6 +44,9 @@ CHANNELS = dict(
     dense_global=100,
     dense_geo=300,
     dense_geo_filt=150,
+    dense2_global=100,  # 2-й эмбеддер (EMB2)
+    dense2_geo=300,
+    dense2_geo_filt=150,
     hist_text=100,     # только при USE_ITEM_HISTORY
     pop_geo=50,        # только при USE_ITEM_HISTORY
 )
@@ -91,10 +94,12 @@ RERANK_VALID_N = 1500      # сколько запросов в valid (early sto
 RERANK_TEST_N = 1500       # сколько в test (итоговая честная цифра)
 
 # ---------------------------------------------------------------- пути
-TRAIN_EMB_DIR = "./retrieve_cache_train_bgem3"
-BENCH_EMB_DIR = "./retrieve_cache_benchmark_bgem3"
-WORK_DIR = "./work_bgem3"
-MODELS_DIR = f"{WORK_DIR}/models"        # вернуть обычный вариант, без models_refit
+TRAIN_EMB_DIR = "./retrieve_cache_train_v3"          # основной эмбеддер: e5 v3 (как в D1)
+BENCH_EMB_DIR = "./retrieve_cache_benchmark_v3"
+# второй эмбеддер: bge-m3 -> каналы dense2_* и признаки cos2*, cos_mean12
+EMB2 = dict(train="./retrieve_cache_train_bgem3", bench="./retrieve_cache_benchmark_bgem3")
+WORK_DIR = "./work_dual"
+MODELS_DIR = f"{WORK_DIR}/models"       # вернуть обычный вариант, без models_refit
 POSTPROC_PARAMS_PATH = f"{WORK_DIR}/postprocess_params.json"
 
 # ---------------------------------------------------------------- модели ранжирования
