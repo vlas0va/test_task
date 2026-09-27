@@ -99,7 +99,7 @@ BENCH_EMB_DIR = "./retrieve_cache_benchmark_v3"
 # второй эмбеддер: bge-m3 -> каналы dense2_* и признаки cos2*, cos_mean12
 EMB2 = dict(train="./retrieve_cache_train_bgem3", bench="./retrieve_cache_benchmark_bgem3")
 WORK_DIR = "./work_dual"
-MODELS_DIR = f"{WORK_DIR}/models"       # вернуть обычный вариант, без models_refit
+MODELS_DIR = f"{WORK_DIR}/models_refit"      # вернуть обычный вариант, без models_refit
 POSTPROC_PARAMS_PATH = f"{WORK_DIR}/postprocess_params.json"
 
 # ---------------------------------------------------------------- модели ранжирования
