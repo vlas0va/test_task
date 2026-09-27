@@ -11,6 +11,7 @@ pool_v2.py
         dense_global     - лучшие по косинусу эмбеддингов (модель 2)
         dense_geo        - лучшие по косинусу в гео-зоне
         dense_geo_filt   - то же + фильтр
+        dense2_*         - те же dense-каналы по ВТОРОМУ эмбеддеру (config_v2.EMB2, напр. bge-m3)
         hist_text, pop_geo - по истории (только если USE_ITEM_HISTORY)
   3) объединяет каналы в пул без дублей;
   4) для КАЖДОЙ пары пула считает точные признаки (не только тех каналов,
@@ -45,7 +46,7 @@ from text_prep import (
 )
 
 CHANNEL_NAMES = ["bm25_global", "bm25_geo", "bm25_geo_filt", "dense_global", "dense_geo",
-                 "dense_geo_filt", "hist_text", "pop_geo"]
+                 "dense_geo_filt", "dense2_global", "dense2_geo", "dense2_geo_filt", "hist_text", "pop_geo"]
 NO_RANK = 9999  # "канал это объявление не нашёл"
 # колонки пула, которые НЕ являются признаками модели
 NON_FEATURE_COLS = {"qrow", "item_pos", "label", "item_microcat", "split"}
@@ -103,12 +104,132 @@ def haversine_km(lat1, lon1, lat2, lon2):
     return 6371.0 * 2 * np.arcsin(np.sqrt(np.clip(a, 0, 1)))
 
 
+# ---------------------------------------------------------------------------- второй эмбеддер
+# Второй набор эмбеддингов (например, e5 + bge-m3) подгружается САМ по item_id / query_uid
+# из config_v2.EMB2 = dict(train=<папка 02/02b train>, bench=<папка benchmark>). Поэтому
+# 04 и 04b менять не нужно: достаточно прописать EMB2 в конфиге.
+# Хранится в float16 (516к x 1024 = 1 ГБ вместо 2 ГБ); на GPU - одним тензором в VRAM,
+# без GPU - косинусы считаются кусками в float32.
+def _emb2_cfg():
+    import config_v2 as C
+    cfg = getattr(C, "EMB2", None)
+    return (cfg, C.BASE) if cfg else (None, C.BASE)
+
+
+def _gather_fp16(src, rows, chunk=50000):
+    """src (mmap, n x d), rows - номера строк -> float16 (len(rows) x d) без полной копии в float32."""
+    out = np.empty((len(rows), src.shape[1]), np.float16)
+    order = np.argsort(rows)                     # читаем mmap по возрастанию - быстрее
+    for s in range(0, len(rows), chunk):
+        o = order[s:s + chunk]
+        out[o] = np.asarray(src[rows[o]], dtype=np.float16)
+    return out
+
+
+def load_emb2_items(item_ids, prefer="train"):
+    """Эмбеддинги 2-го энкодера для объявлений корпуса по item_id.
+    prefer: откуда брать объявление, если оно есть и в train, и в benchmark
+    ("train" - корпус обучения 04, "bench" - корпус бенчмарка в generate_final)."""
+    cfg, base = _emb2_cfg()
+    if cfg is None:
+        return None
+    srcs = {}
+    for key, pq_name in (("train", "train_items.parquet"), ("bench", "benchmark_items.parquet")):
+        path = os.path.join(cfg[key], "item_emb.npy")
+        if not os.path.exists(path):
+            print(f"[emb2] {path} нет")
+            continue
+        ids = pd.read_parquet(os.path.join(base, pq_name), columns=["item_id"])["item_id"].values
+        emb = np.load(path, mmap_mode="r")
+        assert len(emb) == len(ids), f"{path}: {emb.shape} != {pq_name} ({len(ids)})"
+        pos = pd.Series(np.arange(len(ids)), index=ids)
+        srcs[key] = (emb, pos[~pos.index.duplicated()])
+    order = [prefer] + [k for k in ("train", "bench") if k != prefer]
+    order = [k for k in order if k in srcs]
+    if not order:
+        return None
+    dim = srcs[order[0]][0].shape[1]
+    out = np.zeros((len(item_ids), dim), np.float16)
+    done = np.zeros(len(item_ids), bool)
+    for k in order:
+        emb, pos = srcs[k]
+        rows = pos.reindex(item_ids).values
+        m = ~done & ~np.isnan(rows)
+        if m.any():
+            out[m] = _gather_fp16(emb, rows[m].astype(np.int64))
+            done |= m
+        print(f"[emb2] {k}: {int(m.sum())} объявлений")
+    assert done.all(), f"[emb2] для {int((~done).sum())} объявлений нет второго эмбеддинга"
+    return out
+
+
+def load_emb2_queries(queries):
+    """Эмбеддинги 2-го энкодера для запросов: train по query_uid, бенчмарк по query_id."""
+    cfg, base = _emb2_cfg()
+    if cfg is None:
+        return None
+    if "query_uid" in queries.columns:
+        key, col, pq_name = "train", "query_uid", "train_queries.parquet"
+    else:
+        key, col, pq_name = "bench", "query_id", "benchmark_queries.parquet"
+    path = os.path.join(cfg[key], "query_emb.npy")
+    if not os.path.exists(path):
+        print(f"[emb2] {path} нет - dense2-каналы выключены")
+        return None
+    ids = pd.read_parquet(os.path.join(base, pq_name), columns=[col])[col].values
+    emb = np.load(path, mmap_mode="r")
+    assert len(emb) == len(ids), f"{path}: {emb.shape} != {pq_name} ({len(ids)})"
+    pos = pd.Series(np.arange(len(ids)), index=ids)
+    rows = pos[~pos.index.duplicated()].reindex(queries[col].values).values
+    assert not np.isnan(rows).any(), "[emb2] не для всех запросов есть эмбеддинг"
+    return _gather_fp16(emb, rows.astype(np.int64)).astype(np.float32)
+
+
+class _Emb2Scorer:
+    """Косинусы запросов против всего корпуса по 2-му эмбеддеру (результат - float32 numpy b x N)."""
+
+    def __init__(self, item_emb2_fp16):
+        self.N = len(item_emb2_fp16)
+        self.gpu = None
+        try:
+            import torch
+            if torch.cuda.is_available():
+                self.torch = torch
+                self.gpu = torch.from_numpy(item_emb2_fp16).cuda()      # ~1 ГБ VRAM на 516к x 1024
+                print(f"[emb2] {tuple(item_emb2_fp16.shape)} fp16 на GPU")
+        except Exception as e:                                           # нет torch/VRAM - считаем на CPU
+            print(f"[emb2] GPU недоступен ({e}) - CPU")
+            self.gpu = None
+        self.cpu = None if self.gpu is not None else item_emb2_fp16
+
+    def __del__(self):
+        # отдать VRAM сразу (иначе CatBoost на GPU в 04 может не влезть)
+        if getattr(self, "gpu", None) is not None:
+            self.gpu = None
+            try:
+                self.torch.cuda.empty_cache()
+            except Exception:
+                pass
+
+    def scores(self, qe, chunk=65536):
+        if self.gpu is not None:
+            t = self.torch
+            with t.no_grad():
+                q = t.from_numpy(np.ascontiguousarray(qe, dtype=np.float16)).cuda()
+                return (q @ self.gpu.T).float().cpu().numpy()
+        qe = np.asarray(qe, np.float32)
+        out = np.empty((len(qe), self.N), np.float32)
+        for s in range(0, self.N, chunk):
+            out[:, s:s + chunk] = qe @ self.cpu[s:s + chunk].astype(np.float32).T
+        return out
+
+
 # ---------------------------------------------------------------------------- корпус
 class CorpusIndex:
     """Всё, что считается один раз на корпус объявлений."""
 
     def __init__(self, items: pd.DataFrame, item_emb: np.ndarray = None, history=None,
-                 bm25_kw=None, bm25_text_kw=None, bm25_title_kw=None):
+                 bm25_kw=None, bm25_text_kw=None, bm25_title_kw=None, emb2_prefer="train"):
         from config_v2 import BM25_KW, BM25_ITEM_TEXT_KW, BM25_TITLE_KW
         bm25_kw = bm25_kw or BM25_KW
         bm25_text_kw = bm25_text_kw or BM25_ITEM_TEXT_KW
@@ -157,6 +278,12 @@ class CorpusIndex:
         if item_emb is not None:
             assert len(item_emb) == self.N, f"item_emb {item_emb.shape} != corpus {self.N}"
             self.item_emb = np.ascontiguousarray(item_emb, dtype=np.float32)
+        # второй эмбеддер (config_v2.EMB2); None - если не задан
+        self.emb2 = None
+        e2 = load_emb2_items(self.item_ids, prefer=emb2_prefer)
+        if e2 is not None:
+            self.emb2 = _Emb2Scorer(e2)
+            del e2
         self.history = history
         if history is not None:
             history.set_corpus(self.items)
@@ -211,10 +338,13 @@ def build_pool_features(corpus: CorpusIndex, queries: pd.DataFrame, query_emb: n
     if query_emb is not None:
         assert len(query_emb) == len(q), f"query_emb {query_emb.shape} != queries {len(q)}"
     use_dense = corpus.item_emb is not None and query_emb is not None
+    query_emb2 = load_emb2_queries(q) if corpus.emb2 is not None else None
+    use_dense2 = query_emb2 is not None
     hist = corpus.history
     item_hist = hist is not None and getattr(hist, "item_level", False)
     ch_active = [c for c in CHANNEL_NAMES if channels.get(c, 0) > 0
-                 and (use_dense or not c.startswith("dense"))
+                 and (use_dense or not c.startswith("dense_"))
+                 and (use_dense2 or not c.startswith("dense2_"))
                  and (item_hist or c not in ("hist_text", "pop_geo"))]
     print(f"[pool] queries={len(q)} активные каналы: {ch_active}")
 
@@ -280,6 +410,15 @@ def build_pool_features(corpus: CorpusIndex, queries: pd.DataFrame, query_emb: n
             if "dense_geo_filt" in ch_active and has_filt.any():
                 cands["dense_geo_filt"] = topk_rows(C, channels["dense_geo_filt"],
                                                     valid=in_geo & filt_ok & has_filt[:, None])
+        if use_dense2:
+            C2 = corpus.emb2.scores(query_emb2[sl])
+            if "dense2_global" in ch_active:
+                cands["dense2_global"] = topk_rows(C2, channels["dense2_global"])
+            if "dense2_geo" in ch_active:
+                cands["dense2_geo"] = topk_rows(C2, channels["dense2_geo"], valid=in_geo)
+            if "dense2_geo_filt" in ch_active and has_filt.any():
+                cands["dense2_geo_filt"] = topk_rows(C2, channels["dense2_geo_filt"],
+                                                     valid=in_geo & filt_ok & has_filt[:, None])
         if "hist_text" in ch_active:
             cands["hist_text"] = hist.hist_text_topk(qp["qkey"][sl], qp["loc_raw"][sl], channels["hist_text"])
         if "pop_geo" in ch_active:
@@ -325,6 +464,7 @@ def build_pool_features(corpus: CorpusIndex, queries: pd.DataFrame, query_emb: n
         geo_row_max = np.where(in_geo, S, 0).max(axis=1)
         f["bm25"] = bm
         f["bm25_rel"] = bm / np.maximum(row_max[qloc], 1e-6)
+        # если в гео-зоне ни одного BM25-совпадения - признак не определён (nan), а не bm25/1e-6
         f["bm25_rel_geo"] = np.where(geo_row_max[qloc] > 0, bm / np.maximum(geo_row_max[qloc], 1e-6), np.nan)
         geo_supply = (has_bm & in_geo).sum(axis=1)
         f["geo_supply_bm25"] = np.log1p(geo_supply[qloc]).astype(np.float32)
@@ -349,6 +489,14 @@ def build_pool_features(corpus: CorpusIndex, queries: pd.DataFrame, query_emb: n
             geo_cmax = np.where(in_geo, C, -1.0).max(axis=1)
             f["cos_minus_max_geo"] = cos - geo_cmax[qloc]
             del C
+        if use_dense2:
+            cos2 = C2[qloc, ipos]
+            f["cos2"] = cos2
+            f["cos2_minus_max"] = cos2 - C2.max(axis=1)[qloc]
+            f["cos2_minus_max_geo"] = cos2 - np.where(in_geo, C2, -1.0).max(axis=1)[qloc]
+            if use_dense:
+                f["cos_mean12"] = 0.5 * (f["cos"] + cos2)   # согласие двух энкодеров
+            del C2
 
         a = corpus.arr
         f["location_match"] = locm[qloc, ipos].astype(np.int8)

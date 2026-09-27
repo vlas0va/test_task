@@ -21,3 +21,4 @@ runs/
 *.npy
 *.zip
 answer*.csv
+biencoder_bgem3/

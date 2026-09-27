@@ -91,10 +91,10 @@ RERANK_VALID_N = 1500      # сколько запросов в valid (early sto
 RERANK_TEST_N = 1500       # сколько в test (итоговая честная цифра)
 
 # ---------------------------------------------------------------- пути
-TRAIN_EMB_DIR = "./retrieve_cache_train_v3"
-BENCH_EMB_DIR = "./retrieve_cache_benchmark_v3"
-WORK_DIR = "./work_val10_all"
-MODELS_DIR = f"{WORK_DIR}/models_refit"
+TRAIN_EMB_DIR = "./retrieve_cache_train_bgem3"
+BENCH_EMB_DIR = "./retrieve_cache_benchmark_bgem3"
+WORK_DIR = "./work_bgem3"
+MODELS_DIR = f"{WORK_DIR}/models"        # вернуть обычный вариант, без models_refit
 POSTPROC_PARAMS_PATH = f"{WORK_DIR}/postprocess_params.json"
 
 # ---------------------------------------------------------------- модели ранжирования
