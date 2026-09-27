@@ -1,28 +1,14 @@
-"""
-postprocess_v2.py
-=================
-Recall@K по плоской таблице пула + эвристики финального отбора топ-50 поверх
-скора ре-ранкера/ансамбля. ВСЕ эвристики подбираются на valid (tune_postprocess)
-и принимаются, только если дают прирост > min_gain, - а не "на глаз".
+"""Recall@K по таблице пула и эвристики отбора top-50 поверх скора ансамбля.
 
-Эвристики:
-  1. Квоты (quotas): гарантировать попадание top-q любого столбца rank_* -
-     канала кандидатов (rank_bm25_geo, ...) или отдельной модели ансамбля
-     (rank_model_lgb_lambdarank, ...). Это и есть "обучить N моделей и брать
-     разные товары из каждой".
-  2. Жёсткие фильтры (hard): объявления, у которых признак = 0, уходят в КОНЕЦ
-     списка (не выкидываются: если нормальных меньше 50, место всё равно занимается):
-        filter_ok  - не проходит фильтр "Вид/Тип услуги" (по train 98%/95% позитивов проходят)
-        in_geo     - вне гео-зоны запроса (осторожно: 18% позитивов не из своей локации)
-        rating_ok  - ниже порога рейтинга из фильтра (в бенчмарке таких запросов 0)
-        mc_plausible - микрокатегория объявления почти не встречается для слов запроса
-                     (P(микрокат | слова) < 1%) - "фильтрация по категории": search_category
-                     в данных бесполезна (114 почти всегда), реальная категория - микрокатегория
-  3. Разнообразие (diversity): последние D мест из 50 отдаются лучшим по скору
-     объявлениям, у которых значение столбца НЕ встречается среди первых 50-D:
-        item_microcat - другая микрокатегория (запрос неоднозначен: "шар" - воздушные / бильярд)
-        in_geo        - "не местное" объявление (18% выборов - из другой локации)
-        rev_bucket    - другая "отзывная группа" (0 отзывов / 1-10 / 10+)
+Эвристики подбираются на valid координатным спуском и принимаются только при приросте
+больше min_gain. В итоговой модели ни одна не прошла порог (params пустые): ансамбль
+уже учитывает те же сигналы через признаки. Код оставлен, чтобы проверка была воспроизводима.
+
+  quotas    - гарантировать top-q любого rank_* (канала или отдельной модели ансамбля);
+  hard      - объявления с признаком = 0 уходят в конец списка:
+              filter_ok, in_geo, rating_ok, mc_plausible (P(микрокатегория | слова) < 1%);
+  diversity - последние D мест отдаются лучшим объявлениям с новым значением столбца:
+              другая микрокатегория / вне гео-зоны / другая группа по числу отзывов.
 """
 import json
 import numpy as np
@@ -102,7 +88,7 @@ def select_topk(df: pd.DataFrame, score: np.ndarray, params: dict, k: int = 50) 
 
 
 def recall_from_mask(qrow, mask, label, n_rel: pd.Series, return_per_query=False):
-    """n_rel: qrow -> число релевантных ВСЕГО (включая не попавшие в пул)."""
+    """n_rel: qrow -> число релевантных всего, включая не попавшие в пул."""
     hits = pd.Series(label[mask].astype(np.int32)).groupby(qrow[mask]).sum()
     hits = hits.reindex(n_rel.index).fillna(0)
     per_q = (hits / n_rel.clip(lower=1))[n_rel > 0]
@@ -115,7 +101,7 @@ def recall_at_k(qrow, prio, label, n_rel: pd.Series, k: int = 50, return_per_que
 
 
 def pool_recall(qrow, label, n_rel: pd.Series, mask=None):
-    """Потолок: доля релевантных, попавших в пул вообще (или в подмножество mask)."""
+    """Потолок: доля релевантных, попавших в пул (или в подмножество mask)."""
     m = np.ones(len(qrow), bool) if mask is None else mask
     return recall_from_mask(qrow, m, label, n_rel)
 
@@ -127,7 +113,7 @@ def eval_params(df, score, n_rel, params, k=50):
 def tune_postprocess(df_valid: pd.DataFrame, score_valid: np.ndarray, n_rel_valid: pd.Series,
                      k=50, verbose=True, min_gain=0.002, quota_values=(0, 3, 5, 10),
                      div_values=(0, 1, 2, 3)):
-    """Координатный спуск по: жёстким фильтрам, квотам (все rank_*), разнообразию."""
+    """Координатный спуск: жёсткие фильтры, квоты, разнообразие."""
     add_helper_cols(df_valid)
     rank_cols = [c for c in df_valid.columns if c.startswith("rank_")]
     cur = {"quotas": {}, "hard": [], "diversity": {}}
@@ -170,8 +156,3 @@ def load_params(path):
             return json.load(f)
     except FileNotFoundError:
         return {"quotas": {}, "hard": [], "diversity": {}}
-
-
-def apply_postprocess(df, score, params):
-    """Совместимость: приоритет без разнообразия (для 06)."""
-    return adjusted_priority(df, score, params)

@@ -1,14 +1,7 @@
-"""
-custom_head.py
-=================
-Два GeGLU-блока (h = Linear_gate(x) * gelu(Linear_up(x)) -> Linear_down(h),
-плюс residual + LayerNorm) поверх замороженного e5 - "голова", которую реально
-дообучаем. Один линейный слой слишком слабый, чтобы чему-то научиться при
-полностью замороженном энкодере - GeGLU даёт нелинейность и gating.
+"""Голова поверх замороженного энкодера: два GeGLU-блока с residual и LayerNorm.
 
-Файл должен быть отдельным импортируемым .py (не кодом внутри ноутбука),
-потому что sentence-transformers сохраняет/загружает кастомные модули по
-импортируемому пути класса (см. modules.json внутри сохранённой модели).
+Отдельный модуль, потому что sentence-transformers загружает кастомные модули
+по пути класса (custom_head.DoubleGeGLUHead).
 """
 import os
 import json
@@ -32,8 +25,7 @@ class GeGLUBlock(nn.Module):
 
 
 class DoubleGeGLUHead(nn.Module):
-    """Совместим с pipeline sentence-transformers: forward принимает и
-    возвращает dict с ключом 'sentence_embedding'."""
+    """Модуль sentence-transformers: принимает и возвращает dict с 'sentence_embedding'."""
 
     def __init__(self, dim: int, hidden_dim: int = None):
         super().__init__()
@@ -44,10 +36,7 @@ class DoubleGeGLUHead(nn.Module):
         self.block2 = GeGLUBlock(dim, hidden_dim)
 
     def forward(self, features: dict) -> dict:
-        x = features["sentence_embedding"]
-        x = self.block1(x)
-        x = self.block2(x)
-        features["sentence_embedding"] = x
+        features["sentence_embedding"] = self.block2(self.block1(features["sentence_embedding"]))
         return features
 
     def get_sentence_embedding_dimension(self) -> int:
@@ -60,20 +49,16 @@ class DoubleGeGLUHead(nn.Module):
         os.makedirs(output_path, exist_ok=True)
         with open(os.path.join(output_path, "config.json"), "w") as f:
             json.dump(self.get_config_dict(), f)
-        if safe_serialization:
-            save_file(self.state_dict(), os.path.join(output_path, "model.safetensors"))
-        else:
-            torch.save(self.state_dict(), os.path.join(output_path, "pytorch_model.bin"))
+        save_file(self.state_dict(), os.path.join(output_path, "model.safetensors"))
 
     @classmethod
     def load(cls, input_path: str) -> "DoubleGeGLUHead":
         with open(os.path.join(input_path, "config.json")) as f:
-            config = json.load(f)
-        model = cls(**config)
-        safetensors_path = os.path.join(input_path, "model.safetensors")
-        if os.path.exists(safetensors_path):
-            state_dict = load_file(safetensors_path)
+            model = cls(**json.load(f))
+        path = os.path.join(input_path, "model.safetensors")
+        if os.path.exists(path):
+            state = load_file(path)
         else:
-            state_dict = torch.load(os.path.join(input_path, "pytorch_model.bin"), map_location="cpu")
-        model.load_state_dict(state_dict)
+            state = torch.load(os.path.join(input_path, "pytorch_model.bin"), map_location="cpu")
+        model.load_state_dict(state)
         return model

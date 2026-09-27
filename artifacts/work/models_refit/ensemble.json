@@ -1,0 +1,74 @@
+{
+  "models": [
+    {
+      "name": "lgb_lambdarank",
+      "file": "lgb_lambdarank.txt"
+    },
+    {
+      "name": "lgb_binary",
+      "file": "lgb_binary.txt"
+    },
+    {
+      "name": "catboost_yetirank",
+      "file": "catboost_yetirank.cbm"
+    }
+  ],
+  "weights": {
+    "lgb_lambdarank": 1.0,
+    "lgb_binary": 2.0,
+    "catboost_yetirank": 0.5
+  },
+  "features": [
+    "rank_bm25_global",
+    "rank_bm25_geo",
+    "rank_bm25_geo_filt",
+    "rank_dense_global",
+    "rank_dense_geo",
+    "rank_dense_geo_filt",
+    "rank_dense2_global",
+    "rank_dense2_geo",
+    "rank_dense2_geo_filt",
+    "n_channels",
+    "bm25",
+    "bm25_rel",
+    "bm25_rel_geo",
+    "geo_supply_bm25",
+    "geo_supply_filt",
+    "n_bm25_hits_log",
+    "cov_full",
+    "bm25_title",
+    "cov_title",
+    "filter_cov",
+    "filter_ok",
+    "cos",
+    "cos_minus_max",
+    "cos_minus_max_geo",
+    "cos2",
+    "cos2_minus_max",
+    "cos2_minus_max_geo",
+    "cos_mean12",
+    "location_match",
+    "in_geo",
+    "geo_p",
+    "query_loc_has_items",
+    "dist_km_log",
+    "query_loc_size",
+    "item_loc_size",
+    "search_category_is0",
+    "has_filter",
+    "q_ntok",
+    "item_rating",
+    "item_reviews_count",
+    "item_price",
+    "item_phone_hidden",
+    "item_message_forbidden",
+    "title_len",
+    "desc_len",
+    "rating_ok",
+    "hist_text_cnt",
+    "hist_text_mc_share",
+    "tok_mc_share",
+    "tok_mc_is_top"
+  ],
+  "rrf_k": 60
+}

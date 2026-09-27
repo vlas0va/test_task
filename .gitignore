@@ -1,24 +1,31 @@
-.venv/
-__pycache__/
-biencoder_finetuned/
-embed_cache*/
-head_checkpoints*/
-checkpoints/
-retrieve_cache_train*/
-retrieve_cache_benchmark*/
+# данные задачи
+data/
 *.parquet
-answer*.csv
-# большие артефакты - не храним в git
-biencoder_finetuned*/
-biencoder_hardneg*/
-embed_cache*/
-head_checkpoints*/
-retrieve_cache*/
+
+# артефакты: в репозитории только итоговые модели ранжирования
+artifacts/*
+!artifacts/work/
+artifacts/work/*
+!artifacts/work/models_refit/
+!artifacts/work/postprocess_params.json
+
+# ответ, который считает 05 (отправленный лежит в submission/)
+/answer.csv
+answer_*.csv
+
+# папки прошлых экспериментов и служебное
+/_old/
+/biencoder*/
+/embed_cache*/
+/head_checkpoints*/
+/retrieve_cache*/
+/work*/
+/runs/
 catboost_info/
-work_*/
-runs/
-*.parquet
+__pycache__/
+.ipynb_checkpoints/
+.venv/
 *.npy
 *.zip
-answer*.csv
-biencoder_bgem3/
+*.log
+log_*.txt
